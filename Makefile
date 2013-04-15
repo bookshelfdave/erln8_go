@@ -1,2 +1,2 @@
 all:
-	go install erln8/erln8
+	go install metadave/erln8
