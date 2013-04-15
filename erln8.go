@@ -13,6 +13,7 @@ import (
   //"regexp"
   "io"
   "time"
+  "strconv"
   )
 
 
@@ -46,14 +47,11 @@ func readConfig() map[string]interface{} {
     fmt.Printf("Error reading .erln8: %v\n", e)
     os.Exit(1)
   }
-  //fmt.Printf("%s\n", string(file))
   var rawconfig interface{}
   err := json.Unmarshal(file, &rawconfig)
   var _ = err
-  //fmt.Printf("Results: %v\n", rawconfig)
   config := rawconfig.(map[string]interface{})
   erln8Config := config["erln8"].(map[string]interface{})
-  //fmt.Printf("Erlang directory %v\n", erln8Config["erlang_dir"])
   return erln8Config
 }
 
@@ -81,6 +79,7 @@ func createErln8DirIfMissing(dir string) {
 
 
 func downloadErl(erlangs_dir string, filename string) {
+  c := make(chan bool)
   var localfile = filepath.Join(erlangs_dir,"erlangs", filename)
   out, err := os.Create(localfile)
   if err != nil {
@@ -88,24 +87,34 @@ func downloadErl(erlangs_dir string, filename string) {
     return
   }
   defer out.Close()
+  go spinner(c, localfile)
   fmt.Println("Downloading", filename)
   resp, err := http.Get("http://www.erlang.org/download/" + filename)
-  //resp, err := http.Get("http://www.erlang.org/download/otp_src_R15B03.tar.gz")
   defer resp.Body.Close()
   n, err := io.Copy(out, resp.Body)
-  fmt.Println("Downloaded %i bytes", n)
+  close(c)
+  fmt.Println("Downloaded", n, "bytes")
 }
 
-func spinner() {
+func spinner(ch chan bool, f string) {
   time.Sleep(1000 * time.Millisecond)
-  fmt.Printf("*")
-  chars := []string{"\b|","\b/","\b-","\b\\"}
-  for i := 0; i < 100; i++ {
-    for c := range chars {
-      fmt.Printf(chars[c])
-      time.Sleep(250 * time.Millisecond)
-    }
+    lastlen := 0
+  for {
+    select {
+      case <- ch:
+        return
+      default:
+          s, _ := os.Stat(f)
+          sizeStr := strconv.FormatInt(s.Size(), 10)
+          lastlen = len(sizeStr)
+          fmt.Printf("%v",s.Size())
+          for i := 0; i < int(lastlen); i++ {
+            fmt.Printf("\b")
+          }
+          time.Sleep(250 * time.Millisecond)
+   }
   }
+  fmt.Printf("Done!")
 }
 
 func main() {
@@ -114,9 +123,7 @@ func main() {
   var cfg = readConfig()
   var home = cfg["erln8_dir"].(string)
   createErln8DirIfMissing(home)
-  go spinner()
   downloadErl(home, "otp_src_R15B03.tar.gz")
-  spinner()
 }
 
 
