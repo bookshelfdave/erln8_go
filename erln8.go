@@ -9,9 +9,8 @@ import (
   "encoding/json"
   "path/filepath"
   "net/http"
-  //"io/ioutil"
-  //"regexp"
   "io"
+  "regexp"
   "time"
   "strconv"
   )
@@ -49,7 +48,9 @@ func readConfig() map[string]interface{} {
   }
   var rawconfig interface{}
   err := json.Unmarshal(file, &rawconfig)
-  var _ = err
+  if err != nil {
+    log.Fatal("Error reading .erln8 %v",err)
+  }
   config := rawconfig.(map[string]interface{})
   erln8Config := config["erln8"].(map[string]interface{})
   return erln8Config
@@ -71,6 +72,7 @@ func createErln8DirIfMissing(dir string) {
   if !dirExists {
     log.Println(dir + " does not exist, creating")
       os.MkdirAll(filepath.Join(dir,"erlangs"), 0700)
+      os.MkdirAll(filepath.Join(dir,"downloads"), 0700)
       os.MkdirAll(filepath.Join(dir,"settings"), 0700)
       os.MkdirAll(filepath.Join(dir,"cache"), 0700)
       os.MkdirAll(filepath.Join(dir,"current_erl"), 0700)
@@ -80,7 +82,7 @@ func createErln8DirIfMissing(dir string) {
 
 func downloadErl(erlangs_dir string, filename string) {
   c := make(chan bool)
-  var localfile = filepath.Join(erlangs_dir,"erlangs", filename)
+  var localfile = filepath.Join(erlangs_dir,"downloads", filename)
   out, err := os.Create(localfile)
   if err != nil {
     fmt.Println("Can't create file")
@@ -114,7 +116,42 @@ func spinner(ch chan bool, f string) {
           time.Sleep(250 * time.Millisecond)
    }
   }
-  fmt.Printf("Done!")
+  fmt.Printf("Download complete.\n")
+}
+
+
+// func getCustomBuildFlags(url string, platform string, otp_version string, tag string) {
+//   var customURL = url + "/" + platform + "/" + otp_version + "/" + tag
+//   fmt.Printf(customURL + "\n")
+//   // // platform, otp_version, tag
+//   // resp, err := http.Get("http://www.erlang.org/download/")
+//   // if err != nil {
+//   //   log.Fatal("Error downloading list of Erlang versions", err)
+//   // }
+//   // defer resp.Body.Close()
+//   // body, err := ioutil.ReadAll(resp.Body)
+//   // s := string(body)
+
+// }
+
+func listDownloadableErls() {
+  resp, err := http.Get("http://www.erlang.org/download/")
+  if err != nil {
+    log.Fatal("Error downloading list of Erlang versions", err)
+  }
+  defer resp.Body.Close()
+  body, err := ioutil.ReadAll(resp.Body)
+  s := string(body)
+  dlRegex, err := regexp.Compile(`otp_src_R[0-9]+[A-D]+.[0-9]+\.tar\.gz`)
+  versionRegex, _ := regexp.Compile(`otp_src_(?P<version>R[0-9]+[A-D]+.[0-9]+)`)
+  res := dlRegex.FindAllString(s, -1)
+  for i := 0; i < len(res); i++ {
+    //fmt.Println("http://www.erlang.org/download" + res[i])
+    var link = res[i]
+    var matches = versionRegex.FindStringSubmatch(link)
+    var name = matches[1]
+    fmt.Printf("%v\n", name)
+  }
 }
 
 func main() {
@@ -123,7 +160,9 @@ func main() {
   var cfg = readConfig()
   var home = cfg["erln8_dir"].(string)
   createErln8DirIfMissing(home)
-  downloadErl(home, "otp_src_R15B03.tar.gz")
+  //downloadErl(home, "otp_src_R15B03.tar.gz")
+  //listDownloadableErls()
+  //getCustomBuildFlags("http://localhost", "osx64", "R15B03", "default")
 }
 
 
