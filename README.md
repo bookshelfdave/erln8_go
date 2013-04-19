@@ -1,4 +1,11 @@
 erln8
 =====
 
-Go!
+
+### License
+
+http://www.apache.org/licenses/LICENSE-2.0.html
+
+---
+
+© 2013 Dave Parfitt
